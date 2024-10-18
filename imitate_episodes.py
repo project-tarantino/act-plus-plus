@@ -19,7 +19,7 @@ from general_utils.utils import sample_box_pose, sample_insertion_pose # robot f
 from general_utils.utils import compute_dict_mean, set_seed, detach_dict, calibrate_linear_vel, postprocess_base_action # helper functions
 from act.policy import ACTPolicy, CNNMLPPolicy, DiffusionPolicy
 from visualize_episodes import save_videos
-from general_utils.config_handler import create_config, create_task_config
+from general_utils.config_handler import create_config, create_task_config, make_policy
 
 from detr.models.latent_model import Latent_Model_Transformer
 
@@ -105,18 +105,6 @@ def main(args):
 
         save_best_checkpoint(ckpt_dir, best_ckpt_info)
         wandb.finish()
-
-
-def make_policy(policy_class, policy_config):
-    if policy_class == 'ACT':
-        policy = ACTPolicy(policy_config)
-    elif policy_class == 'CNNMLP':
-        policy = CNNMLPPolicy(policy_config)
-    elif policy_class == 'Diffusion':
-        policy = DiffusionPolicy(policy_config)
-    else:
-        raise NotImplementedError
-    return policy
 
 
 def make_optimizer(policy_class, policy):
