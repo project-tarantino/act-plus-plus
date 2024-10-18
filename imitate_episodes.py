@@ -107,18 +107,6 @@ def main(args):
         wandb.finish()
 
 
-def make_optimizer(policy_class, policy):
-    if policy_class == 'ACT':
-        optimizer = policy.configure_optimizers()
-    elif policy_class == 'CNNMLP':
-        optimizer = policy.configure_optimizers()
-    elif policy_class == 'Diffusion':
-        optimizer = policy.configure_optimizers()
-    else:
-        raise NotImplementedError
-    return optimizer
-
-
 def get_image(ts, camera_names, rand_crop_resize=False):
     curr_images = []
     for cam_name in camera_names:
