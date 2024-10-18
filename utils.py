@@ -138,8 +138,9 @@ class EpisodicDataset(torch.utils.data.Dataset):
 
             qpos_data = (qpos_data - self.norm_stats["qpos_mean"]) / self.norm_stats["qpos_std"]
 
-        except:
+        except Exception as e:
             print(f'Error loading {dataset_path} in __getitem__')
+            print(e)
             quit()
 
         # print(image_data.dtype, qpos_data.dtype, action_data.dtype, is_pad.dtype)
