@@ -1,6 +1,8 @@
 import os
 import pickle
 
+from act.policy import ACTPolicy, CNNMLPPolicy, DiffusionPolicy
+
 
 def create_policy_config(policy_class, camera_names, args):
     lr_backbone = 1e-5
@@ -108,3 +110,14 @@ def create_config(task_config, args, policy_class, camera_names, ckpt_dir, task_
     }
     save_config(ckpt_dir, config)
     return config
+
+def make_policy(policy_class, policy_config):
+    if policy_class == 'ACT':
+        policy = ACTPolicy(policy_config)
+    elif policy_class == 'CNNMLP':
+        policy = CNNMLPPolicy(policy_config)
+    elif policy_class == 'Diffusion':
+        policy = DiffusionPolicy(policy_config)
+    else:
+        raise NotImplementedError
+    return policy

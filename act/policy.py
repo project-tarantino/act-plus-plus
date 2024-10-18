@@ -293,3 +293,15 @@ def kl_divergence(mu, logvar):
     mean_kld = klds.mean(1).mean(0, True)
 
     return total_kld, dimension_wise_kld, mean_kld
+
+
+def make_optimizer(policy_class, policy):
+    if policy_class == 'ACT':
+        optimizer = policy.configure_optimizers()
+    elif policy_class == 'CNNMLP':
+        optimizer = policy.configure_optimizers()
+    elif policy_class == 'Diffusion':
+        optimizer = policy.configure_optimizers()
+    else:
+        raise NotImplementedError
+    return optimizer
