@@ -17,7 +17,7 @@ from constants import PUPPET_GRIPPER_JOINT_OPEN
 from general_utils.utils import load_data # data functions
 from general_utils.utils import sample_box_pose, sample_insertion_pose # robot functions
 from general_utils.utils import compute_dict_mean, set_seed, detach_dict, calibrate_linear_vel, postprocess_base_action # helper functions
-from policy import ACTPolicy, CNNMLPPolicy, DiffusionPolicy
+from act.policy import ACTPolicy, CNNMLPPolicy, DiffusionPolicy
 from visualize_episodes import save_videos
 from general_utils.config_handler import create_config, create_task_config
 
