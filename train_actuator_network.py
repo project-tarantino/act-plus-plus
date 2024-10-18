@@ -12,7 +12,7 @@ import pickle
 import matplotlib.pyplot as plt
 from copy import deepcopy
 from tqdm import tqdm
-from utils import find_all_hdf5
+from general_utils.utils import find_all_hdf5
 from imitate_episodes import repeater, compute_dict_mean
 
 import IPython
