@@ -27,6 +27,9 @@ from sim_env import BOX_POSE
 import IPython
 e = IPython.embed
 
+WANDB_PROJECT = "eggs-machina"
+WANDB_ENTITY = "alanbohannon-hypernour-llc"
+
 def get_auto_index(dataset_dir):
     max_idx = 1000
     for i in range(max_idx+1):
@@ -145,7 +148,7 @@ def main(args):
     config_path = os.path.join(ckpt_dir, 'config.pkl')
     expr_name = ckpt_dir.split('/')[-1]
     if not is_eval:
-        wandb.init(project="mobile-aloha2", reinit=True, entity="mobile-aloha2", name=expr_name)
+        wandb.init(project=WANDB_PROJECT, reinit=True, entity=WANDB_ENTITY, name=expr_name)
         wandb.config.update(config)
     with open(config_path, 'wb') as f:
         pickle.dump(config, f)
