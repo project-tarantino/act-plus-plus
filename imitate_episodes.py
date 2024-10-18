@@ -19,6 +19,7 @@ from utils import sample_box_pose, sample_insertion_pose # robot functions
 from utils import compute_dict_mean, set_seed, detach_dict, calibrate_linear_vel, postprocess_base_action # helper functions
 from policy import ACTPolicy, CNNMLPPolicy, DiffusionPolicy
 from visualize_episodes import save_videos
+from general_utils.config_handler import create_config, create_task_config
 
 from detr.models.latent_model import Latent_Model_Transformer
 
@@ -27,6 +28,9 @@ from sim_env import BOX_POSE
 import IPython
 e = IPython.embed
 
+WANDB_PROJECT = "eggs-machina"
+WANDB_ENTITY = "alanbohannon-hypernour-llc"
+
 def get_auto_index(dataset_dir):
     max_idx = 1000
     for i in range(max_idx+1):
@@ -34,149 +38,73 @@ def get_auto_index(dataset_dir):
             return i
     raise Exception(f"Error getting auto index, or more than {max_idx} episodes")
 
+def evaluate(config):
+    ckpt_names = [f'policy_last.ckpt']
+    results = []
+    for ckpt_name in ckpt_names:
+        success_rate, avg_return = eval_bc(config, ckpt_name, save_episode=True, num_rollouts=10)
+        # wandb.log({'success_rate': success_rate, 'avg_return': avg_return})
+        results.append([ckpt_name, success_rate, avg_return])
+
+    for ckpt_name, success_rate, avg_return in results:
+        print(f'{ckpt_name}: {success_rate=} {avg_return=}')
+    print()
+
+
+def save_dataset_stats(ckpt_dir, stats):
+    stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
+    with open(stats_path, 'wb') as f:
+        pickle.dump(stats, f)
+
+def save_best_checkpoint(ckpt_dir, best_ckpt_info):
+    best_step, min_val_loss, best_state_dict = best_ckpt_info
+    ckpt_path = os.path.join(ckpt_dir, f'policy_best.ckpt')
+    torch.save(best_state_dict, ckpt_path)
+    print(f'Best ckpt, val loss {min_val_loss:.6f} @ step{best_step}')
+
+    
+
 def main(args):
     set_seed(1)
     # command line parameters
     is_eval = args['eval']
     ckpt_dir = args['ckpt_dir']
     policy_class = args['policy_class']
-    onscreen_render = args['onscreen_render']
     task_name = args['task_name']
     batch_size_train = args['batch_size']
     batch_size_val = args['batch_size']
-    num_steps = args['num_steps']
-    eval_every = args['eval_every']
-    validate_every = args['validate_every']
-    save_every = args['save_every']
-    resume_ckpt_path = args['resume_ckpt_path']
 
     # get task parameters
     is_sim = task_name[:4] == 'sim_'
-    if is_sim or task_name == 'all':
-        from constants import SIM_TASK_CONFIGS
-        task_config = SIM_TASK_CONFIGS[task_name]
-    else:
-        from aloha_scripts.constants import TASK_CONFIGS
-        task_config = TASK_CONFIGS[task_name]
+    task_config = create_task_config(is_sim, task_name)
+
     dataset_dir = task_config['dataset_dir']
     # num_episodes = task_config['num_episodes']
-    episode_len = task_config['episode_len']
     camera_names = task_config['camera_names']
     stats_dir = task_config.get('stats_dir', None)
     sample_weights = task_config.get('sample_weights', None)
     train_ratio = task_config.get('train_ratio', 0.99)
     name_filter = task_config.get('name_filter', lambda n: True)
 
-    # fixed parameters
-    state_dim = 14
-    lr_backbone = 1e-5
-    backbone = 'resnet18'
-    if policy_class == 'ACT':
-        enc_layers = 4
-        dec_layers = 7
-        nheads = 8
-        policy_config = {'lr': args['lr'],
-                         'num_queries': args['chunk_size'],
-                         'kl_weight': args['kl_weight'],
-                         'hidden_dim': args['hidden_dim'],
-                         'dim_feedforward': args['dim_feedforward'],
-                         'lr_backbone': lr_backbone,
-                         'backbone': backbone,
-                         'enc_layers': enc_layers,
-                         'dec_layers': dec_layers,
-                         'nheads': nheads,
-                         'camera_names': camera_names,
-                         'vq': args['use_vq'],
-                         'vq_class': args['vq_class'],
-                         'vq_dim': args['vq_dim'],
-                         'action_dim': 16,
-                         'no_encoder': args['no_encoder'],
-                         }
-    elif policy_class == 'Diffusion':
-
-        policy_config = {'lr': args['lr'],
-                         'camera_names': camera_names,
-                         'action_dim': 16,
-                         'observation_horizon': 1,
-                         'action_horizon': 8,
-                         'prediction_horizon': args['chunk_size'],
-                         'num_queries': args['chunk_size'],
-                         'num_inference_timesteps': 10,
-                         'ema_power': 0.75,
-                         'vq': False,
-                         }
-    elif policy_class == 'CNNMLP':
-        policy_config = {'lr': args['lr'], 'lr_backbone': lr_backbone, 'backbone' : backbone, 'num_queries': 1,
-                         'camera_names': camera_names,}
-    else:
-        raise NotImplementedError
-
-    actuator_config = {
-        'actuator_network_dir': args['actuator_network_dir'],
-        'history_len': args['history_len'],
-        'future_len': args['future_len'],
-        'prediction_len': args['prediction_len'],
-    }
-
-    config = {
-        'num_steps': num_steps,
-        'eval_every': eval_every,
-        'validate_every': validate_every,
-        'save_every': save_every,
-        'ckpt_dir': ckpt_dir,
-        'resume_ckpt_path': resume_ckpt_path,
-        'episode_len': episode_len,
-        'state_dim': state_dim,
-        'lr': args['lr'],
-        'policy_class': policy_class,
-        'onscreen_render': onscreen_render,
-        'policy_config': policy_config,
-        'task_name': task_name,
-        'seed': args['seed'],
-        'temporal_agg': args['temporal_agg'],
-        'camera_names': camera_names,
-        'real_robot': not is_sim,
-        'load_pretrain': args['load_pretrain'],
-        'actuator_config': actuator_config,
-    }
-
     if not os.path.isdir(ckpt_dir):
         os.makedirs(ckpt_dir)
-    config_path = os.path.join(ckpt_dir, 'config.pkl')
-    expr_name = ckpt_dir.split('/')[-1]
-    if not is_eval:
-        wandb.init(project="mobile-aloha2", reinit=True, entity="mobile-aloha2", name=expr_name)
-        wandb.config.update(config)
-    with open(config_path, 'wb') as f:
-        pickle.dump(config, f)
+
+    config = create_config(task_config, args, policy_class, camera_names, ckpt_dir, task_name, is_sim)
+
     if is_eval:
-        ckpt_names = [f'policy_last.ckpt']
-        results = []
-        for ckpt_name in ckpt_names:
-            success_rate, avg_return = eval_bc(config, ckpt_name, save_episode=True, num_rollouts=10)
-            # wandb.log({'success_rate': success_rate, 'avg_return': avg_return})
-            results.append([ckpt_name, success_rate, avg_return])
+        evaluate(config)
+    else:
+        expr_name = ckpt_dir.split('/')[-1]
+        wandb.init(project=WANDB_PROJECT, reinit=True, entity=WANDB_ENTITY, name=expr_name)
+        wandb.config.update(config)
+        train_dataloader, val_dataloader, stats, _ = load_data(dataset_dir, name_filter, camera_names, batch_size_train, batch_size_val, args['chunk_size'], args['skip_mirrored_data'], config['load_pretrain'], policy_class, stats_dir_l=stats_dir, sample_weights=sample_weights, train_ratio=train_ratio)
 
-        for ckpt_name, success_rate, avg_return in results:
-            print(f'{ckpt_name}: {success_rate=} {avg_return=}')
-        print()
-        exit()
+        save_dataset_stats(ckpt_dir, stats)
 
-    train_dataloader, val_dataloader, stats, _ = load_data(dataset_dir, name_filter, camera_names, batch_size_train, batch_size_val, args['chunk_size'], args['skip_mirrored_data'], config['load_pretrain'], policy_class, stats_dir_l=stats_dir, sample_weights=sample_weights, train_ratio=train_ratio)
+        best_ckpt_info = train_bc(train_dataloader, val_dataloader, config)
 
-    # save dataset stats
-    stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
-    with open(stats_path, 'wb') as f:
-        pickle.dump(stats, f)
-
-    best_ckpt_info = train_bc(train_dataloader, val_dataloader, config)
-    best_step, min_val_loss, best_state_dict = best_ckpt_info
-
-    # save best checkpoint
-    ckpt_path = os.path.join(ckpt_dir, f'policy_best.ckpt')
-    torch.save(best_state_dict, ckpt_path)
-    print(f'Best ckpt, val loss {min_val_loss:.6f} @ step{best_step}')
-    wandb.finish()
+        save_best_checkpoint(ckpt_dir, best_ckpt_info)
+        wandb.finish()
 
 
 def make_policy(policy_class, policy_config):
@@ -502,8 +430,8 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
         highest_rewards.append(episode_highest_reward)
         print(f'Rollout {rollout_id}\n{episode_return=}, {episode_highest_reward=}, {env_max_reward=}, Success: {episode_highest_reward==env_max_reward}')
 
-        # if save_episode:
-        #     save_videos(image_list, DT, video_path=os.path.join(ckpt_dir, f'video{rollout_id}.mp4'))
+        if save_episode:
+            save_videos(image_list, DT, video_path=os.path.join(ckpt_dir, f'video{rollout_id}.mp4'))
 
     success_rate = np.mean(np.array(highest_rewards) == env_max_reward)
     avg_return = np.mean(episode_returns)
