@@ -60,17 +60,16 @@ def main(args):
     train_ratio = task_config.get('train_ratio', 0.99)
     name_filter = task_config.get('name_filter', lambda n: True)
 
-    config = create_config(task_config, args, policy_class, camera_names, ckpt_dir, task_name, is_sim)
-
     if not os.path.isdir(ckpt_dir):
         os.makedirs(ckpt_dir)
-    config_path = os.path.join(ckpt_dir, 'config.pkl')
+
+    config = create_config(task_config, args, policy_class, camera_names, ckpt_dir, task_name, is_sim)
+
+
     expr_name = ckpt_dir.split('/')[-1]
     if not is_eval:
         wandb.init(project=WANDB_PROJECT, reinit=True, entity=WANDB_ENTITY, name=expr_name)
         wandb.config.update(config)
-    with open(config_path, 'wb') as f:
-        pickle.dump(config, f)
     if is_eval:
         ckpt_names = [f'policy_last.ckpt']
         results = []

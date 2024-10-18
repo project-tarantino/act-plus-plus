@@ -1,3 +1,7 @@
+import os
+import pickle
+
+
 def create_policy_config(policy_class, camera_names, args):
     lr_backbone = 1e-5
     backbone = 'resnet18'
@@ -62,6 +66,11 @@ def create_actuator_config(args):
     }
     return actuator_config
 
+def save_config(ckpt_dir, config):
+    config_path = os.path.join(ckpt_dir, 'config.pkl')
+    with open(config_path, 'wb') as f:
+        pickle.dump(config, f)
+
 def create_config(task_config, args, policy_class, camera_names, ckpt_dir, task_name, is_sim):
     onscreen_render = args['onscreen_render']
     num_steps = args['num_steps']
@@ -97,4 +106,5 @@ def create_config(task_config, args, policy_class, camera_names, ckpt_dir, task_
         'load_pretrain': args['load_pretrain'],
         'actuator_config': actuator_config,
     }
+    save_config(ckpt_dir, config)
     return config
