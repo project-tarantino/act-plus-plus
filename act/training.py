@@ -10,6 +10,7 @@ from torchvision import transforms
 from general_utils.utils import compute_dict_mean, set_seed # helper functions
 from general_utils.config_handler import make_policy
 from act.policy import make_optimizer
+from act.evaluation import eval_bc
 
 
 def forward_pass(data, policy):
@@ -27,7 +28,7 @@ def repeater(data_loader):
         epoch += 1
 
 
-def train_bc(train_dataloader, val_dataloader, config, eval_bc: callable):
+def train_bc(train_dataloader, val_dataloader, config):
     num_steps = config['num_steps']
     ckpt_dir = config['ckpt_dir']
     seed = config['seed']
