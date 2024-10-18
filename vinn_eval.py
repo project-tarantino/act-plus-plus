@@ -11,7 +11,7 @@ from PIL import Image
 import torchvision
 from torchvision import transforms
 # from visualize_episodes import visualize_joints
-from utils import set_seed, sample_box_pose
+from general_utils.utils import set_seed, sample_box_pose
 # from imitate_episodes import get_image
 from sim_env import BOX_POSE
 from constants import DT

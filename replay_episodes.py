@@ -3,7 +3,7 @@ import h5py
 import argparse
 from collections import defaultdict 
 from sim_env import make_sim_env
-from utils import sample_box_pose, sample_insertion_pose
+from general_utils.utils import sample_box_pose, sample_insertion_pose
 from sim_env import BOX_POSE
 from constants import DT
 from visualize_episodes import save_videos
