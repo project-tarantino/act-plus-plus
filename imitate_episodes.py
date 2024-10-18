@@ -502,8 +502,8 @@ def eval_bc(config, ckpt_name, save_episode=True, num_rollouts=50):
         highest_rewards.append(episode_highest_reward)
         print(f'Rollout {rollout_id}\n{episode_return=}, {episode_highest_reward=}, {env_max_reward=}, Success: {episode_highest_reward==env_max_reward}')
 
-        # if save_episode:
-        #     save_videos(image_list, DT, video_path=os.path.join(ckpt_dir, f'video{rollout_id}.mp4'))
+        if save_episode:
+            save_videos(image_list, DT, video_path=os.path.join(ckpt_dir, f'video{rollout_id}.mp4'))
 
     success_rate = np.mean(np.array(highest_rewards) == env_max_reward)
     avg_return = np.mean(episode_returns)
