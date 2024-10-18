@@ -19,6 +19,7 @@ from utils import sample_box_pose, sample_insertion_pose # robot functions
 from utils import compute_dict_mean, set_seed, detach_dict, calibrate_linear_vel, postprocess_base_action # helper functions
 from policy import ACTPolicy, CNNMLPPolicy, DiffusionPolicy
 from visualize_episodes import save_videos
+from general_utils.config_handler import create_config, create_task_config
 
 from detr.models.latent_model import Latent_Model_Transformer
 
@@ -43,105 +44,23 @@ def main(args):
     is_eval = args['eval']
     ckpt_dir = args['ckpt_dir']
     policy_class = args['policy_class']
-    onscreen_render = args['onscreen_render']
     task_name = args['task_name']
     batch_size_train = args['batch_size']
     batch_size_val = args['batch_size']
-    num_steps = args['num_steps']
-    eval_every = args['eval_every']
-    validate_every = args['validate_every']
-    save_every = args['save_every']
-    resume_ckpt_path = args['resume_ckpt_path']
 
     # get task parameters
     is_sim = task_name[:4] == 'sim_'
-    if is_sim or task_name == 'all':
-        from constants import SIM_TASK_CONFIGS
-        task_config = SIM_TASK_CONFIGS[task_name]
-    else:
-        from aloha_scripts.constants import TASK_CONFIGS
-        task_config = TASK_CONFIGS[task_name]
+    task_config = create_task_config(is_sim, task_name)
+
     dataset_dir = task_config['dataset_dir']
     # num_episodes = task_config['num_episodes']
-    episode_len = task_config['episode_len']
     camera_names = task_config['camera_names']
     stats_dir = task_config.get('stats_dir', None)
     sample_weights = task_config.get('sample_weights', None)
     train_ratio = task_config.get('train_ratio', 0.99)
     name_filter = task_config.get('name_filter', lambda n: True)
 
-    # fixed parameters
-    state_dim = 14
-    lr_backbone = 1e-5
-    backbone = 'resnet18'
-    if policy_class == 'ACT':
-        enc_layers = 4
-        dec_layers = 7
-        nheads = 8
-        policy_config = {'lr': args['lr'],
-                         'num_queries': args['chunk_size'],
-                         'kl_weight': args['kl_weight'],
-                         'hidden_dim': args['hidden_dim'],
-                         'dim_feedforward': args['dim_feedforward'],
-                         'lr_backbone': lr_backbone,
-                         'backbone': backbone,
-                         'enc_layers': enc_layers,
-                         'dec_layers': dec_layers,
-                         'nheads': nheads,
-                         'camera_names': camera_names,
-                         'vq': args['use_vq'],
-                         'vq_class': args['vq_class'],
-                         'vq_dim': args['vq_dim'],
-                         'action_dim': 16,
-                         'no_encoder': args['no_encoder'],
-                         }
-    elif policy_class == 'Diffusion':
-
-        policy_config = {'lr': args['lr'],
-                         'camera_names': camera_names,
-                         'action_dim': 16,
-                         'observation_horizon': 1,
-                         'action_horizon': 8,
-                         'prediction_horizon': args['chunk_size'],
-                         'num_queries': args['chunk_size'],
-                         'num_inference_timesteps': 10,
-                         'ema_power': 0.75,
-                         'vq': False,
-                         }
-    elif policy_class == 'CNNMLP':
-        policy_config = {'lr': args['lr'], 'lr_backbone': lr_backbone, 'backbone' : backbone, 'num_queries': 1,
-                         'camera_names': camera_names,}
-    else:
-        raise NotImplementedError
-
-    actuator_config = {
-        'actuator_network_dir': args['actuator_network_dir'],
-        'history_len': args['history_len'],
-        'future_len': args['future_len'],
-        'prediction_len': args['prediction_len'],
-    }
-
-    config = {
-        'num_steps': num_steps,
-        'eval_every': eval_every,
-        'validate_every': validate_every,
-        'save_every': save_every,
-        'ckpt_dir': ckpt_dir,
-        'resume_ckpt_path': resume_ckpt_path,
-        'episode_len': episode_len,
-        'state_dim': state_dim,
-        'lr': args['lr'],
-        'policy_class': policy_class,
-        'onscreen_render': onscreen_render,
-        'policy_config': policy_config,
-        'task_name': task_name,
-        'seed': args['seed'],
-        'temporal_agg': args['temporal_agg'],
-        'camera_names': camera_names,
-        'real_robot': not is_sim,
-        'load_pretrain': args['load_pretrain'],
-        'actuator_config': actuator_config,
-    }
+    config = create_config(task_config, args, policy_class, camera_names, ckpt_dir, task_name, is_sim)
 
     if not os.path.isdir(ckpt_dir):
         os.makedirs(ckpt_dir)
