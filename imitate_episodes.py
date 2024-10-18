@@ -38,6 +38,32 @@ def get_auto_index(dataset_dir):
             return i
     raise Exception(f"Error getting auto index, or more than {max_idx} episodes")
 
+def evaluate(config):
+    ckpt_names = [f'policy_last.ckpt']
+    results = []
+    for ckpt_name in ckpt_names:
+        success_rate, avg_return = eval_bc(config, ckpt_name, save_episode=True, num_rollouts=10)
+        # wandb.log({'success_rate': success_rate, 'avg_return': avg_return})
+        results.append([ckpt_name, success_rate, avg_return])
+
+    for ckpt_name, success_rate, avg_return in results:
+        print(f'{ckpt_name}: {success_rate=} {avg_return=}')
+    print()
+
+
+def save_dataset_stats(ckpt_dir, stats):
+    stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
+    with open(stats_path, 'wb') as f:
+        pickle.dump(stats, f)
+
+def save_best_checkpoint(ckpt_dir, best_ckpt_info):
+    best_step, min_val_loss, best_state_dict = best_ckpt_info
+    ckpt_path = os.path.join(ckpt_dir, f'policy_best.ckpt')
+    torch.save(best_state_dict, ckpt_path)
+    print(f'Best ckpt, val loss {min_val_loss:.6f} @ step{best_step}')
+
+    
+
 def main(args):
     set_seed(1)
     # command line parameters
@@ -65,39 +91,20 @@ def main(args):
 
     config = create_config(task_config, args, policy_class, camera_names, ckpt_dir, task_name, is_sim)
 
-
-    expr_name = ckpt_dir.split('/')[-1]
-    if not is_eval:
+    if is_eval:
+        evaluate(config)
+    else:
+        expr_name = ckpt_dir.split('/')[-1]
         wandb.init(project=WANDB_PROJECT, reinit=True, entity=WANDB_ENTITY, name=expr_name)
         wandb.config.update(config)
-    if is_eval:
-        ckpt_names = [f'policy_last.ckpt']
-        results = []
-        for ckpt_name in ckpt_names:
-            success_rate, avg_return = eval_bc(config, ckpt_name, save_episode=True, num_rollouts=10)
-            # wandb.log({'success_rate': success_rate, 'avg_return': avg_return})
-            results.append([ckpt_name, success_rate, avg_return])
+        train_dataloader, val_dataloader, stats, _ = load_data(dataset_dir, name_filter, camera_names, batch_size_train, batch_size_val, args['chunk_size'], args['skip_mirrored_data'], config['load_pretrain'], policy_class, stats_dir_l=stats_dir, sample_weights=sample_weights, train_ratio=train_ratio)
 
-        for ckpt_name, success_rate, avg_return in results:
-            print(f'{ckpt_name}: {success_rate=} {avg_return=}')
-        print()
-        exit()
+        save_dataset_stats(ckpt_dir, stats)
 
-    train_dataloader, val_dataloader, stats, _ = load_data(dataset_dir, name_filter, camera_names, batch_size_train, batch_size_val, args['chunk_size'], args['skip_mirrored_data'], config['load_pretrain'], policy_class, stats_dir_l=stats_dir, sample_weights=sample_weights, train_ratio=train_ratio)
+        best_ckpt_info = train_bc(train_dataloader, val_dataloader, config)
 
-    # save dataset stats
-    stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
-    with open(stats_path, 'wb') as f:
-        pickle.dump(stats, f)
-
-    best_ckpt_info = train_bc(train_dataloader, val_dataloader, config)
-    best_step, min_val_loss, best_state_dict = best_ckpt_info
-
-    # save best checkpoint
-    ckpt_path = os.path.join(ckpt_dir, f'policy_best.ckpt')
-    torch.save(best_state_dict, ckpt_path)
-    print(f'Best ckpt, val loss {min_val_loss:.6f} @ step{best_step}')
-    wandb.finish()
+        save_best_checkpoint(ckpt_dir, best_ckpt_info)
+        wandb.finish()
 
 
 def make_policy(policy_class, policy_config):
